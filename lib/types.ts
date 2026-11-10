@@ -1,5 +1,25 @@
+export type Role = "customer" | "staff" | "owner";
 export type PetType = "dog" | "cat" | "other";
 export type BookingStatus = "pending" | "confirmed" | "in_progress" | "completed" | "cancelled";
+
+export interface Profile {
+  id: string;
+  email: string | null;
+  full_name: string;
+  phone: string | null;
+  role: Role;
+  created_at: string;
+}
+
+export interface Pet {
+  id: string;
+  owner_id: string;
+  name: string;
+  pet_type: PetType;
+  breed: string | null;
+  weight: number | null;
+  note: string | null;
+}
 
 export interface Service {
   id: string;
@@ -26,6 +46,9 @@ export interface ShopSettings {
 export interface Booking {
   id: string;
   booking_code: string;
+  user_id: string | null;
+  pet_id: string | null;
+  staff_id: string | null;
   service_id: string;
   customer_name: string;
   phone: string;
@@ -41,4 +64,5 @@ export interface Booking {
   status: BookingStatus;
   created_at: string;
   services?: { name: string } | null;
+  staff?: { full_name: string } | null;
 }

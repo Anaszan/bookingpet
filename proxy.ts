@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// รีเฟรช session ของ Supabase ทุก request ที่เข้าหน้าแอดมิน
+// รีเฟรช session ของ Supabase ทุก request
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   const supabase = createServerClient(
@@ -22,4 +22,6 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/admin/:path*"] };
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+};

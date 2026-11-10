@@ -1,15 +1,18 @@
-import { createClient } from "@/lib/supabase/server";
-import type { Service, ShopSettings } from "@/lib/types";
+import { requireRole } from "@/lib/supabase/server";
+import type { Pet, Service, ShopSettings } from "@/lib/types";
 import BookingForm from "./BookingForm";
-
-export const dynamic = "force-dynamic";
 
 export default async function BookPage({ searchParams }: { searchParams: Promise<{ service?: string }> }) {
   const { service } = await searchParams;
-  const supabase = await createClient();
-  const [{ data: services }, { data: settings }] = await Promise.all([
+  const { supabase, user, profile } = await requireRole(
+    ["customer", "staff", "owner"],
+    service ? `/book?service=${service}` : "/book"
+  );
+
+  const [{ data: services }, { data: settings }, { data: pets }] = await Promise.all([
     supabase.from("services").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("shop_settings").select("*").single(),
+    supabase.from("pets").select("*").eq("owner_id", user.id).order("created_at"),
   ]);
 
   if (!settings) return <p className="text-red-600">ไม่สามารถโหลดข้อมูลร้านได้ กรุณาตรวจสอบการตั้งค่า Supabase</p>;
@@ -20,6 +23,8 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
       <BookingForm
         services={(services ?? []) as Service[]}
         settings={settings as ShopSettings}
+        pets={(pets ?? []) as Pet[]}
+        profile={profile}
         initialServiceId={service}
       />
     </div>

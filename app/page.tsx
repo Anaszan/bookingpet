@@ -20,7 +20,7 @@ export default async function Home() {
         <p className="mt-3 text-stone-600">จองคิวออนไลน์ได้ตลอด 24 ชม. เลือกบริการ วัน และเวลาที่สะดวก</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="/book" className="btn px-6 py-3 text-lg">จองคิวเลย</Link>
-          <Link href="/check" className="btn-outline px-6 py-3 text-lg">เช็คคิวของฉัน</Link>
+          <Link href="/account" className="btn-outline px-6 py-3 text-lg">คิวของฉัน</Link>
         </div>
         {s && (
           <p className="mt-6 text-sm text-stone-600">

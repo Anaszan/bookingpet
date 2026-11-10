@@ -1,4 +1,15 @@
-import type { BookingStatus } from "./types";
+import type { BookingStatus, Role } from "./types";
+
+export const ROLE_LABEL: Record<Role, string> = { customer: "ลูกค้า", staff: "พนักงาน", owner: "เจ้าของร้าน" };
+export const ROLE_COLOR: Record<Role, string> = {
+  customer: "bg-stone-100 text-stone-700",
+  staff: "bg-sky-100 text-sky-800",
+  owner: "bg-brand-100 text-brand-700",
+};
+export const PET_EMOJI: Record<string, string> = { dog: "🐶", cat: "🐱", other: "🐰" };
+
+/** ป้องกัน open redirect: รับเฉพาะ path ภายในเว็บ */
+export const safeNext = (n?: string | null) => (n && n.startsWith("/") && !n.startsWith("//") ? n : null);
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {
   pending: "รอยืนยัน",
