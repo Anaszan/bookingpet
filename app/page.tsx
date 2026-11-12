@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import type { Service, ShopSettings } from "@/lib/types";
-import { baht, hhmm, PET_LABEL, WEEKDAYS } from "@/lib/utils";
+import type { CalendarEvent, Service, ShopSettings } from "@/lib/types";
+import { baht, EVENT_COLOR, EVENT_LABEL, hhmm, PET_LABEL, thaiDate, todayBkk, WEEKDAYS } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const supabase = await createClient();
-  const [{ data: services }, { data: settings }] = await Promise.all([
+  const [{ data: services }, { data: settings }, { data: upcoming }] = await Promise.all([
     supabase.from("services").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("shop_settings").select("*").single(),
+    supabase.from("calendar_events").select("*").gte("end_date", todayBkk()).order("start_date").limit(4),
   ]);
+  const events = (upcoming ?? []) as CalendarEvent[];
   const s = settings as ShopSettings | null;
 
   return (
@@ -30,6 +32,28 @@ export default async function Home() {
           </p>
         )}
       </section>
+
+      {events.length > 0 && (
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">ข่าวสารจากร้าน</h2>
+            <Link href="/calendar" className="text-sm text-brand-700 hover:underline">ดูปฏิทินทั้งหมด →</Link>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {events.map((e) => (
+              <Link key={e.id} href={`/calendar?month=${e.start_date.slice(0, 7)}&date=${e.start_date}`} className="card flex gap-3 p-4 hover:border-brand-300">
+                <span className={`h-fit shrink-0 rounded-full px-2 py-0.5 text-xs ${EVENT_COLOR[e.event_type]}`}>{EVENT_LABEL[e.event_type]}</span>
+                <span>
+                  <span className="block font-medium">{e.title}</span>
+                  <span className="text-xs text-stone-500">
+                    {thaiDate(e.start_date)}{e.end_date !== e.start_date && ` – ${thaiDate(e.end_date)}`}
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-4 text-xl font-semibold">บริการของเรา</h2>

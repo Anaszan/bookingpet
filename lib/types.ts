@@ -21,6 +21,17 @@ export interface Pet {
   note: string | null;
 }
 
+export type EventType = "holiday" | "event" | "promotion" | "notice";
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  event_type: EventType;
+}
+
 export interface Service {
   id: string;
   name: string;

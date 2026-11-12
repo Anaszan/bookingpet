@@ -1,4 +1,43 @@
-import type { BookingStatus, Role } from "./types";
+import type { BookingStatus, EventType, Role } from "./types";
+
+export const EVENT_LABEL: Record<EventType, string> = {
+  holiday: "วันหยุดร้าน",
+  event: "กิจกรรม",
+  promotion: "โปรโมชัน",
+  notice: "ประกาศ",
+};
+export const EVENT_COLOR: Record<EventType, string> = {
+  holiday: "bg-red-100 text-red-800",
+  event: "bg-sky-100 text-sky-800",
+  promotion: "bg-emerald-100 text-emerald-800",
+  notice: "bg-amber-100 text-amber-800",
+};
+export const EVENT_DOT: Record<EventType, string> = {
+  holiday: "bg-red-500",
+  event: "bg-sky-500",
+  promotion: "bg-emerald-500",
+  notice: "bg-amber-500",
+};
+export const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
+/** "2026-11-30", 1 -> "2026-12-01" */
+export function addDays(date: string, n: number) {
+  const d = new Date(date + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** ขยายช่วงวันของ event ทั้งหมดเป็น Set ของวันที่ */
+export function expandDates(ranges: { start_date: string; end_date: string }[]) {
+  const set = new Set<string>();
+  for (const r of ranges) {
+    for (let d = r.start_date; d <= r.end_date; d = addDays(d, 1)) set.add(d);
+  }
+  return set;
+}
 
 export const ROLE_LABEL: Record<Role, string> = { customer: "ลูกค้า", staff: "พนักงาน", owner: "เจ้าของร้าน" };
 export const ROLE_COLOR: Record<Role, string> = {

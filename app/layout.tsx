@@ -30,6 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href="/" className="text-lg font-semibold text-brand-700">🐾 Happy Paws</Link>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <Link href="/book" className="hover:text-brand-600">จองคิว</Link>
+              <Link href="/calendar" className="hover:text-brand-600">ปฏิทิน</Link>
               {profile && (
                 <>
                   <Link href="/account" className="hover:text-brand-600">คิวของฉัน</Link>

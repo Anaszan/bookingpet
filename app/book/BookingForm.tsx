@@ -8,9 +8,10 @@ import { availableSlots, baht, nowMinBkk, PET_EMOJI, PET_LABEL, thaiDate, todayB
 type Busy = { start_time: string; end_time: string };
 
 export default function BookingForm({
-  services, settings, pets: initialPets, profile, initialServiceId,
+  services, settings, pets: initialPets, profile, initialServiceId, holidayDates,
 }: {
   services: Service[]; settings: ShopSettings; pets: Pet[]; profile: Profile; initialServiceId?: string;
+  holidayDates: string[];
 }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
@@ -40,10 +41,12 @@ export default function BookingForm({
     const list: string[] = [];
     for (let i = 0; i <= settings.max_days_ahead; i++) {
       const d = todayBkk(i);
-      if (!settings.closed_weekdays.includes(new Date(d + "T00:00:00").getDay())) list.push(d);
+      if (settings.closed_weekdays.includes(new Date(d + "T00:00:00").getDay())) continue;
+      if (holidayDates.includes(d)) continue;
+      list.push(d);
     }
     return list;
-  }, [settings]);
+  }, [settings, holidayDates]);
 
   useEffect(() => {
     if (!date) return;
