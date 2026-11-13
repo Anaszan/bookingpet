@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { getSession } from "@/lib/supabase/server";
-import type { CalendarEvent, EventType, ShopSettings } from "@/lib/types";
+import type { BookingStatus, CalendarEvent, EventType, ShopSettings } from "@/lib/types";
 import {
-  EVENT_COLOR, EVENT_DOT, EVENT_LABEL, THAI_MONTHS, thaiDate, todayBkk,
+  EVENT_COLOR, EVENT_DOT, EVENT_LABEL, hhmm, PET_EMOJI, STATUS_COLOR, STATUS_LABEL, THAI_MONTHS, thaiDate, todayBkk,
 } from "@/lib/utils";
 import { deleteEvent, saveEvent } from "./actions";
 
 const WEEK_HEAD = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
+type DayBooking = {
+  id: string; start_time: string; end_time: string; status: BookingStatus;
+  pet_name: string; pet_type: string; customer_name: string; user_id: string | null;
+  services: { name: string } | null;
+};
 const TYPES = Object.keys(EVENT_LABEL) as EventType[];
 
 export default async function CalendarPage({
@@ -27,15 +33,30 @@ export default async function CalendarPage({
   const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? sp.date! : null;
 
-  const [{ data: evData }, { data: loads }, { data: settings }] = await Promise.all([
+  const [{ data: evData }, { data: loads }, { data: settings }, { data: busyData }, { data: detailData }] = await Promise.all([
     supabase.from("calendar_events").select("*")
       .lte("start_date", last).gte("end_date", first).order("start_date"),
     supabase.rpc("get_day_loads", { p_from: first, p_to: last }),
-    supabase.from("shop_settings").select("closed_weekdays, staff_count").single(),
+    supabase.from("shop_settings").select("closed_weekdays, staff_count, open_time, close_time").single(),
+    // ช่วงเวลาที่มีคิวของวันที่เลือก (เห็นแค่เวลา ไม่เห็นข้อมูลลูกค้า)
+    selected ? supabase.rpc("get_busy_slots", { p_date: selected }) : Promise.resolve({ data: null }),
+    // รายละเอียดคิว: พนักงานเห็นทุกคิว, ลูกค้าเห็นเฉพาะของตัวเอง
+    selected && profile
+      ? (() => {
+          let q = supabase.from("bookings")
+            .select("id, start_time, end_time, status, pet_name, pet_type, customer_name, user_id, services(name)")
+            .eq("booking_date", selected).neq("status", "cancelled").order("start_time");
+          if (!canEdit) q = q.eq("user_id", profile.id);
+          return q;
+        })()
+      : Promise.resolve({ data: null }),
   ]);
+  const busy = ((busyData ?? []) as { start_time: string; end_time: string }[])
+    .slice().sort((a, b) => a.start_time.localeCompare(b.start_time));
+  const details = (detailData ?? []) as unknown as DayBooking[];
   const events = (evData ?? []) as CalendarEvent[];
   const loadMap = new Map(((loads ?? []) as { booking_date: string; bookings: number }[]).map((l) => [l.booking_date, l.bookings]));
-  const s = settings as Pick<ShopSettings, "closed_weekdays" | "staff_count"> | null;
+  const s = settings as Pick<ShopSettings, "closed_weekdays" | "staff_count" | "open_time" | "close_time"> | null;
   const closedWeekdays = s?.closed_weekdays ?? [];
 
   const eventsOn = (d: string) => events.filter((e) => e.start_date <= d && e.end_date >= d);
@@ -142,9 +163,86 @@ export default async function CalendarPage({
                   )}
                 </div>
               ))}
-              {!dayEvents.some((e) => e.event_type === "holiday") && selected >= today && (
-                <Link href={`/book`} className="btn w-full text-sm">จองคิวในวันนี้</Link>
-              )}
+              {(() => {
+                const holiday = dayEvents.some((e) => e.event_type === "holiday");
+                const weeklyOff = closedWeekdays.includes(new Date(selected + "T00:00:00Z").getUTCDay());
+                if (holiday || weeklyOff) {
+                  return <p className="rounded-lg bg-stone-100 p-3 text-sm text-stone-600">🚫 ร้านปิดในวันนี้</p>;
+                }
+                const mineIds = new Set(details.filter((d) => d.user_id === profile?.id).map((d) => d.id));
+                return (
+                  <div className="space-y-3 border-t border-stone-100 pt-3">
+                    <div className="flex items-baseline justify-between">
+                      <h3 className="text-sm font-semibold">คิวในวันนี้</h3>
+                      {s && <span className="text-xs text-stone-500">เปิด {hhmm(s.open_time)}–{hhmm(s.close_time)} น.</span>}
+                    </div>
+
+                    {canEdit ? (
+                      /* พนักงาน/เจ้าของร้าน: เห็นรายละเอียดทุกคิว */
+                      details.length === 0 ? <p className="text-sm text-stone-500">ยังไม่มีคิว</p> : (
+                        <ul className="space-y-2">
+                          {details.map((b) => (
+                            <li key={b.id} className="rounded-lg border border-stone-100 p-2 text-sm">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold">🕐 {hhmm(b.start_time)}–{hhmm(b.end_time)} น.</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_COLOR[b.status]}`}>{STATUS_LABEL[b.status]}</span>
+                              </div>
+                              <div className="mt-0.5 text-stone-600">{b.services?.name}</div>
+                              <div className="text-xs text-stone-500">{PET_EMOJI[b.pet_type]} {b.pet_name} · 👤 {b.customer_name}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    ) : (
+                      <>
+                        {/* ลูกค้า: คิวของตัวเอง */}
+                        {details.length > 0 && (
+                          <ul className="space-y-2">
+                            {details.map((b) => (
+                              <li key={b.id} className="rounded-lg border-2 border-brand-200 bg-brand-50 p-2 text-sm">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-semibold">⭐ คิวของคุณ {hhmm(b.start_time)}–{hhmm(b.end_time)} น.</span>
+                                  <span className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_COLOR[b.status]}`}>{STATUS_LABEL[b.status]}</span>
+                                </div>
+                                <div className="mt-0.5 text-stone-600">{b.services?.name} · {PET_EMOJI[b.pet_type]} {b.pet_name}</div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {/* ทุกคน: ช่วงเวลาที่มีคิวแล้ว (ไม่แสดงข้อมูลลูกค้า) */}
+                        {busy.length === 0 ? (
+                          <p className="text-sm text-emerald-700">✅ ยังว่างทั้งวัน</p>
+                        ) : (
+                          <div>
+                            <p className="mb-1.5 text-xs text-stone-500">ช่วงเวลาที่มีคิวแล้ว ({busy.length} คิว)</p>
+                            <ul className="space-y-1">
+                              {busy.map((b, i) => {
+                                const mine = details.some((d) => mineIds.has(d.id) && d.start_time === b.start_time && d.end_time === b.end_time);
+                                return (
+                                  <li key={i} className={`flex items-center justify-between rounded-md px-2 py-1 text-sm ${mine ? "bg-brand-50 text-brand-700" : "bg-stone-50"}`}>
+                                    <span>🕐 {hhmm(b.start_time)} – {hhmm(b.end_time)} น.</span>
+                                    <span className="text-xs text-stone-400">{mine ? "คิวของคุณ" : "มีคิวแล้ว"}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                            {s && s.staff_count > 1 && (
+                              <p className="mt-1.5 text-xs text-stone-400">ร้านรับได้พร้อมกัน {s.staff_count} คิว ช่วงเวลาที่มีคิวแล้วอาจยังจองได้</p>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {canEdit && (
+                      <Link href={`/staff?date=${selected}`} className="btn-outline w-full text-sm">เปิดในหน้าคิวร้าน</Link>
+                    )}
+                    {selected >= today && (
+                      <Link href="/book" className="btn w-full text-sm">จองคิวในวันนี้</Link>
+                    )}
+                  </div>
+                );
+              })()}
             </section>
           ) : (
             <section className="card text-sm text-stone-500">กดเลือกวันในปฏิทินเพื่อดูรายละเอียด</section>
